@@ -5,4 +5,4 @@ use different sensors with the ESP32 and control them using a web interface
 
 All sensors can be connected via I2C to the ESP. The SD Card is connected via SPI.
 
-The connecting layout will be uploaded in the future.
+![Shematics](https://github.com/Hakzel/ESP32-Sensor-Tool/blob/master/EAGLE/ESP32-Sensor-Tool.PNG)
