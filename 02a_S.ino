@@ -40,93 +40,64 @@ void setup() {
   ulReqcount = 0;
 
   // AP mode
-  WiFi.mode(WIFI_AP);
-  WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
-  WiFi.softAP(ssid, password);
+  //WiFi.mode(WIFI_AP);
+  //WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
+  //WiFi.softAP(ssid, password);
+
+  WiFi.softAP(ssid, password);        //configuration of the WiFi Access Point
+  IPAddress IP = WiFi.softAPIP();
+
+//  WiFi.mode(WIFI_STA);
+//  WiFi.begin("WLAN24", "198994357017134733422568");
+
+  
+
   
   server.begin();
 
+  server.on("/", handleRoot);      //Which routine to handle at root location. This is display page
+  server.on("/getPlot", handlePlot);
+  server.on("/GetData", handleData);
+  server.on("/GetString", handleString);
+ 
+
+
   
-   // print start page:
-  server.on("/", []() {
-    server.send(200, "text/html", getContent());
-  });
+// //print plotPage
+//  server.on("/plot", []() {
+//    server.send(200, "text/html", getPlot());
+//  });
 
-  //print plotPage
-  server.on("/plot", []() {
-    server.send(200, "text/html", getPlot());
-  });
+//  //print LinkPage
+//  server.on("/links", []() {
+//    server.send(200, "text/html", getLinks());
+//  });
 
-  //print plotPage
-  server.on("/links", []() {
-    server.send(200, "text/html", getLinks());
-  });
-
-  // control output1:
-  server.on("/output1", []() {
-    if (output1_state)
-    {
-      //digitalWrite(output1, LOW);
-      output1_state = false;
-    }
-    else
-    {
-      //digitalWrite(output1, HIGH);
-      output1_state = true;
-    }
-    server.send(200, "text/html", getContent());
-  });
-
-  // control output2:
-  server.on("/datalog", []() {
-    if (datalog)
-    {
-      //digitalWrite(output2, LOW);
-      datalog = false;
-    }
-    else
-    {
-      //digitalWrite(output2, HIGH);
-      datalog = true;
-      datalog_millis = millis();
-      File dataFile = SD.open(filetowrite, FILE_WRITE);
-      dataFile.close();
-    }
-    server.send(200, "text/html", getContent());
-  });
-
-  // control trigger reset:
-  server.on("/trigger_reset", []() {
-    trigger_res = true;
-    server.send(200, "text/html", getContent());
-  });
-
-  // control refresh links:
-  server.on("/refreshlinks", []() {
-      root = SD.open("/");
-      getfilelinks ="";
-while(true) {
-     File entry =  root.openNextFile();
-     if (! entry) {
-       // no more files
-       break;
-     }
-     getfilelinks += "<p><a href='";
-     getfilelinks += entry.name();
-     getfilelinks += "'>";
-     getfilelinks += entry.name();
-     getfilelinks += "</a></p>";
-     entry.close();
-     cnt++;
-}
-cnt=1;
-    server.send(200, "text/html", getLinks());
-});
-
-
-server.on("/specificArgs", handleSpecificArg);   //Associate the handler function to the path
-
-
+//  // control refresh links:
+//  server.on("/refreshlinks", []() {
+//      root = SD.open("/");
+//      getfilelinks ="";
+//while(true) {
+//     File entry =  root.openNextFile();
+//     if (! entry) {
+//       // no more files
+//       break;
+//     }
+//     mystring = "";
+//     mystring += entry.name();
+//     if(mystring.endsWith(".CSV")){
+//        getfilelinks += "<p><a href='";
+//        getfilelinks += mystring;
+//        getfilelinks += "' class='button'>";
+//        getfilelinks += mystring;
+//        getfilelinks += "</a></p>";
+//      }
+//     entry.close();
+//     cnt++;    
+//}
+//cnt=1;
+//    server.send(200, "text/html", getLinks());
+//});
 
 
 // things for data server on sd card

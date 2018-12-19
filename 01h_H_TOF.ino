@@ -92,8 +92,14 @@ void Loop_TOF() {
         plotWebsite += 256 - (display_buffer[temp - 1] - min_display) / (scale_display / 4);
       plotWebsite += " ";
     }
-    plotWebsite += "' style='fill:none;stroke:black;stroke-width:1' />  Sorry, your browser does not support inline SVG.";
-    plotWebsite += "<text x='05' y='15' fill='blue'>current reading: ";
+    plotWebsite += "' style='fill:none;stroke:#4CAF50;stroke-width:1' />  Sorry, your browser does not support inline SVG.";
+
+    plotWebsite += "<g fill='none' stroke='gray' stroke-width='1'>";
+    plotWebsite += "<path stroke-dasharray='5,5' d='M0 150 384 150' />";
+    plotWebsite += "<path stroke-dasharray='5,5' d='M0 250 384 250' />";
+    plotWebsite += "<path stroke-dasharray='5,5' d='M0 50  384 50' /></g>";
+    
+    plotWebsite += "<text x='05' y='15' fill='gray'>current reading: ";
     plotWebsite += tof_distance;
     plotWebsite += " mm </text>";
 
@@ -108,6 +114,11 @@ void Loop_TOF() {
         mystring += (int)millis() - datalog_millis ;
         mystring += "," ;
         mystring += (float)tof_distance ;
+        if(dataNewComment == true){
+              mystring += ",";
+              mystring += dataComment;
+              dataNewComment = false;
+        }
         mystring += ";"  ;
         dataFile.print(mystring);
         dataFile.println("");

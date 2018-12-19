@@ -72,6 +72,29 @@ void Loop_Thermo() {
         display.drawLine(i , 64 - display_buffer[temp - 1] , i + 1 , 64 - display_buffer[temp] );
     }
 
+    plotWebsite = "<svg height='300' width='384'><polyline points='";
+    for (int i = 1; i <= 128 ; i++) { //draw the lines of the FFT on the webpage
+      temp = i + i_display_buffer;
+      if (temp > 127) {
+        temp = temp - 128;
+      }
+      plotWebsite += i * 3;
+      plotWebsite += ",";
+      if (temp == 0) {
+        plotWebsite += 256 - (display_buffer[temp] - min_display) / (scale_display / 4);
+      } else
+        plotWebsite += 256 - (display_buffer[temp - 1] - min_display) / (scale_display / 4);
+      plotWebsite += " ";
+    }
+    plotWebsite += "' style='fill:none;stroke:#4CAF50;stroke-width:1' />  Sorry, your browser does not support inline SVG.";
+    plotWebsite += "<text x='05' y='15' fill='gray'>current reading: ";
+    plotWebsite += thermo_signal_obj;
+    plotWebsite += " °C </text>";
+
+    plotWebsite += "</svg> ";
+
+    
+
   }// END OF THERMO LOOP
 
 

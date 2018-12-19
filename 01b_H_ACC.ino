@@ -19,8 +19,8 @@ bool init_adxl = true;
 unsigned int sampling_period_us, counter = 0;
 unsigned long microseconds;
 int x, y, z; //acceleration values of all axis
-double max_peak = 0;
-byte peak[] = {0, 0, 0, 0, 0, 0, 0};
+
+
 double vReal[SAMPLES];
 double vImag[SAMPLES];
 float  fReal[SAMPLES / 2];
@@ -69,9 +69,9 @@ void Loop_ACC() {
       acc_measurand = 1;
     }
 
-    if (FFT_mode == 1 || FFT_mode == 2) { //sampling data for FFT
+    if (FFT_mode == 1 || FFT_mode == 2 || FFT_mode == 4) { //sampling data for FFT
 
-      if (!output1_state)
+      if (FFT_mode == 4) // generate some example data for an FFT
       {
         for (int i = 0; i < SAMPLES; i++) {   //function generator for test
           //vReal[i] = (float)500 * sin(2 * 3.14 * 32.7 * i / SAMPLING_FREQUENCY) + 1000 * sin(2 * 3.14 * 24.39 * i / SAMPLING_FREQUENCY); //
@@ -80,7 +80,7 @@ void Loop_ACC() {
         }
       }
 
-      if (output1_state) {
+      if (FFT_mode != 4) {
         i_trigger_frequency = 0;
         for (int i = 0; i < SAMPLES; i++) {
           newTime = micros();
@@ -95,6 +95,7 @@ void Loop_ACC() {
             vReal[i] = z;
           } //
           //dTime[i] = micros();
+          //yield();
           while (micros() < (newTime + sampling_period_us)) {
             /* do nothing to wait */
           }
@@ -153,11 +154,11 @@ void Loop_ACC() {
       FFT.Windowing(vReal, SAMPLES, FFT_WIN_TYP_HAMMING, FFT_FORWARD);
       FFT.Compute(vReal, vImag, SAMPLES, FFT_FORWARD);
       FFT.ComplexToMagnitude(vReal, vImag, SAMPLES);
-      double peak = FFT.MajorPeak(vReal, SAMPLES, SAMPLING_FREQUENCY);
+      peak = FFT.MajorPeak(vReal, SAMPLES, SAMPLING_FREQUENCY);
       fres = (float)SAMPLING_FREQUENCY / SAMPLES;
       f_scale = freq_max / 64;
 
-      if (FFT_mode == 1) { //Plotting the FFT
+      if (FFT_mode == 1 || FFT_mode == 4) { //Plotting the FFT
         if (acc_measurand == 1) { //plotting the acceleration FFT
           max_peak = 1000;
           for (int i = 2; i < 128 * f_scale; i++) { //find maximum value for scaling
@@ -178,23 +179,27 @@ void Loop_ACC() {
         for (int i = 1; i < 129 ; i++) { //draw the lines of the FFT on the webpage
           plotWebsite += i * 3;
           plotWebsite += ",";
-          plotWebsite += 256 - amplitude * vReal[i] / (max_peak / 4);
+          plotWebsite += 256 - amplitude * vReal[i * f_scale] / (max_peak / 4);
           plotWebsite += " ";
         }
-        plotWebsite += "' style='fill:none;stroke:black;stroke-width:1' />  Sorry, your browser does not support inline SVG.";
-        for (int i = 1; i <= 8 ; i++) { //draw the text for the frequencies
+        plotWebsite += "' style='fill:none;stroke:#4CAF50;stroke-width:1' ></polyline>  Sorry, your browser does not support inline SVG.";
+        plotWebsite += "<polygon points='0,0 0,260 48,260 48,40 48,260 96,260 96,40 96,260 144,260 144,40 144,260 192,260 192,40 192, 260 240,260 240,40 240,260 288,260 288,40 288,260 336,260 336,40 336,260 384,260 384,0' style='fill:none;stroke:gray;stroke-width:0.5'></polygon>";
+        for (int i = 1; i <= 7 ; i++) { //draw the text for the frequencies
           plotWebsite += "<text x='";
-          plotWebsite += 64 * i - 10;
-          plotWebsite += "' y='280' fill='red'>";
-          plotWebsite += i * 6;
-          plotWebsite += " Hz </text>";
+          plotWebsite += 48 * i - 10;
+          plotWebsite += "' y='280' fill='gray'>";
+          plotWebsite += i * 8 * f_scale;
+          plotWebsite += " </text>";
         }
-        plotWebsite += "<text x='05' y='15' fill='blue'>max frequency: ";
+        plotWebsite += "<text x='05' y='20' fill='gray'>max frequency: ";
         plotWebsite += peak;
         plotWebsite += " Hz </text>";
 
         plotWebsite += "</svg> ";
-
+//        PlotPage = plotWebsite;
+//        server.send(200, "text/plane", PlotPage); //Send web page
+//        server.send(200, "text/plane", ledState); //Send web page
+        
         if (datalog) { //logging of the data
           File dataFile = SD.open(filetowrite, FILE_APPEND);
           // if the file is available, write to it:
@@ -204,11 +209,18 @@ void Loop_ACC() {
             mystring += (int)millis() - datalog_millis;
             mystring += ",";
             mystring += (float)peak;
+            mystring += ",";
+            mystring += f_rot;
+            if(dataNewComment == true){
+              mystring += ",";
+              mystring += dataComment;
+              dataNewComment = false;
+            }
             mystring += ";";
             dataFile.print(mystring);
             mystring ="";
             dataFile.println("");
-            for (int i = 1; i <= 256 ; i++) {
+            for (int i = 1; i <= 512 ; i++) {
               mystring += (int)vReal[i];
               mystring += ",";
             }

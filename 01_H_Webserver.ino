@@ -3,6 +3,7 @@
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <WebServer.h>
+#include "index.h"
 
 File root;
 int cnt=1;
@@ -43,6 +44,7 @@ const int output2 = 101;
 
 String myValue   = "TEST";
 String datafile  = "DATALOG";
+String dataComment = "";
 String filetowrite = "/";
 
 
@@ -55,6 +57,8 @@ boolean output1_state = true;
 boolean datalog = false;
 boolean refreshlinks = false;
 bool    datalogging = false;
+bool    pause_datalogging = false;
+boolean dataNewComment = false;
 
 bool FFT_Tool;
 bool ADC_Tool;
@@ -82,121 +86,95 @@ int max_display = 200, min_display = 0, scale_display = (max_display - min_displ
 
 int imu_mode = 1;
 
-
+double max_peak = 0;
+double peak;
 WebServer server(80);
 
-String headlinks = "<p>  <a href='/'>Home</a>  |  <a href='/plot'>PlotPage</a>   |   <a href='/links'>Download</a>   </p>";
 
-String getContent()
+
+
+
+// https://www.w3schools.com/code/tryit.asp?filename=FY7XAKT2A93U
+
+
+String getControls()
 {
   // create content for the website:
-  String content = "<html><head><title>ESP8266 WebControl</title></head><body>";
-  content += "<meta name='viewport' content='width=device-width, initial-scale=1'>";   //fit webpage to screen size
-  content += headlinks;
+  String content = "";
   
-  if (FFT_Tool) {
+   if (FFT_Tool) {
     content += "Control the FFT_Tool<br /><br />";
-
-    content += plotWebsite;
-
-    content += "<table><tr>";
-
-    if (output1_state)
-    {
-      content += "<td align 'left'> Tool (active): </td> <td align='center'> <a href='output1'><button>-> deactivate</button></a></td>";
-    }
-    else
-    {
-      content += "<td align 'left'> Tool (inactive): </td> <td align='center'> <a href='output1'><button>-> activate</button></a></td>";
-    }
-
+    content += R"(<br>
+        <table align='center'><tr>
+            <td align='left'> ordinal number inner ring:</td>
+            <td align='left'><form><input type='number' step='0.01' id='FFT_O_Inner' placeholder='10.90'></td>)";
+    content +="<td align='left'> <input type='button' onclick=\"SendString('FFT_O_Inner','')\" class='button'></form></td>";
+    content += R"(</tr>
+            <tr>
+            <td align='left'> ordinal number outer ring:</td>
+            <td align='left'><form><input type='number' step='0.01' id="FFT_O_Outer" placeholder="8.13"></td>)";
+    content += "<td align='left'> <input type='button' onclick=\"SendString('FFT_O_Outer','')\" class='button'></form></td>";
+    content += R"(</tr>
+          <tr>
+            <td align='left'> ordinal number rolling element:</td>
+            <td align='left'><form><input type='number' step='0.01' id='FFT_O_Roller' placeholder='6.72'></td>)";
+    content +="<td align='left'> <input type='button' onclick=\"SendString('FFT_O_Roller','')\" class='button'></form></td>";
+    content += R"(</tr>
+          <tr>
+            <td align='left'> frequency of rotation:</td>
+            <td align='left'><form><input type='number' step='0.01' id='FFT_F_Rot' placeholder='3.00'></td>)";
+    content +="<td align='left'> <input type='button' onclick=\"SendString('FFT_F_Rot','')\" class='button'></form></td>";
     content += "</tr></table>";
-
-    content += R"(
-    <br><br><form action=/specificArgs method=get>
-        <table>
-          <tr>
-            <td align='left'> ordinal number inner ring:</td> 
-            <td align='left'> <input type='number' step='0.01' name=ordinal_number_inner min='0' max='999' placeholder=')";
-    content += on_inner;
-    content += R"(
-          '> </td>
-          </tr>
-          <tr>
-            <td align='left'> ordinal number outer ring:</td> 
-            <td align='left'> <input type='number' step='0.01' name=ordinal_number_outer min='0' max='999' placeholder=')";
-    content += on_outer;
-    content += R"(
-            '> </td>
-          </tr>
-          <tr>
-            <td align='left'> ordinal number rolling element:</td> 
-            <td align='left'> <input type='number' step='0.01' name=ordinal_number_ball min='0' max='999' placeholder=')";
-    content += on_ball;
-    content += R"(
-            '> </td>
-          </tr>
-          <tr>
-            <td align='left'> frequency of rotation [Hz]:</td> 
-            <td align='left'> <input type='number' step='0.01' name=rot_freq min='0' max='999' placeholder=')";
-    content += f_rot;
-    content += R"(
-            '> </td>
-          </tr>
-          <tr>
-           <td align='left'> <input type=submit value=send> <INPUT type=reset> </td> 
-        </tr>
-      </table>
-   </form>)";
-
-    content +=    "<br><br>measurement mode";
-    content +=    "<form action=/specificArgs method=get>";
-    content +=    "<input type='radio' name=measurement_mode value=1 onclick='this.form.submit()'";
+       
+    content +=    "<br><br><br>measurement mode";
+    content +=    "<form>";
+    content +=    "<input type='radio' onclick=\"sendData('FFT_Mode',1,'ControlPage')\"";
     if (FFT_mode == 1)content +=    " checked ";
     content +=    ">show FFT<BR>";
-    content +=    "<input type='radio' name=measurement_mode value=2 onclick='this.form.submit()'";
+    content +=    "<input type='radio' onclick=\"sendData('FFT_Mode',2,'ControlPage')\"";
     if (FFT_mode == 2)content += " checked";
     content +=    ">bearing detection<BR>";
-    content +=    "<input type='radio' name=measurement_mode value=3 onclick='this.form.submit()'";
+    content +=    "<input type='radio' onclick=\"sendData('FFT_Mode',3,'ControlPage')\"";
     if (FFT_mode == 3)content += " checked";
     content +=    ">display raw values<BR>";
+    content +=    "<input type='radio' onclick=\"sendData('FFT_Mode',4,'ControlPage')\"";
+    if (FFT_mode == 4)content += " checked";
+    content +=    ">display example FFT<BR>";
     content +=    "</form>";
 
-
-
     content +=    "<br><br>measurement direction";
-    content +=    "<form action=/specificArgs method=get>";
-    content +=    "<input type='radio' name=acc_orientation value=1 onclick='this.form.submit()'";
+    content +=    "<form>";
+    content +=    "<input type='radio' onclick=\"sendData('FFT_Orientation',1,'ControlPage')\"";
     if (acc_measurement == 1)content +=    " checked ";
     content +=    ">x-direction<BR>";
-    content +=    "<input type='radio' name=acc_orientation value=2 onclick='this.form.submit()'";
+    content +=    "<input type='radio' onclick=\"sendData('FFT_Orientation',2,'ControlPage')\"";
     if (acc_measurement == 2)content += " checked";
     content +=    ">y-direction<BR>";
-    content +=    "<input type='radio' name=acc_orientation value=3 onclick='this.form.submit()'";
+    content +=    "<input type='radio' onclick=\"sendData('FFT_Orientation',3,'ControlPage')\"";
     if (acc_measurement == 3)content += " checked";
     content +=    ">z-direction<BR>";
     content +=    "</form>";
 
     content +=    "<br><br>displayed FFT";
-    content +=    "<form action=/specificArgs method=get>";
-    content +=    "<input type='radio' name=displayed_value value=1 onclick='this.form.submit()'";
+    content +=    "<form>";
+    content +=    "<input type='radio' onclick=\"sendData('FFT_Units',1,'ControlPage')\"";
     if (acc_measurand == 1)content +=    " checked ";
     content +=    ">Acceleration<BR>";
-    content +=    "<input type='radio' name=displayed_value value=2 onclick='this.form.submit()'";
+    content +=    "<input type='radio' onclick=\"sendData('FFT_Units',2,'ControlPage')\"";
     if (acc_measurand == 2)content += " checked";
     content +=    ">Displacement<BR>";
     content +=    "</form>";
 
 
     content +=    "<br><br>max-plot-frequency";
-    content +=    "<form action=/specificArgs method=get>";
-    content +=    "<input type='radio' name=max_freq value=64 onclick='this.form.submit()'";
+    content +=    "<form>";
+    content +=    "<input type='radio' onclick=\"sendData('FFT_MaxFreq',64,'ControlPage')\"";
     if (freq_max == 64)content +=    " checked ";
     content +=    ">64Hz<BR>";
-    content +=    "<input type='radio' name=max_freq value=128 onclick='this.form.submit()'";
+    content +=    "<input type='radio' onclick=\"sendData('FFT_MaxFreq',128,'ControlPage')\"";
     if (freq_max == 128)content += " checked";
     content +=    ">128Hz<BR>";
-    content +=    "<input type='radio' name=max_freq value=256 onclick='this.form.submit()'";
+    content +=    "<input type='radio' onclick=\"sendData('FFT_MaxFreq',256,'ControlPage')\"";
     if (freq_max == 256)content += " checked";
     content +=    ">256Hz<BR>";
     content +=    "</form>";
@@ -214,24 +192,16 @@ String getContent()
   if (Trigger_Tool) {
     content += "Control the Trigger_Tool<br />";
 
-    content += R"(
-    <br><br><form action=/specificArgs method=get>
-        <table>
-          <tr>
-            <td align='left'> diameter of roller:</td> 
-            <td align='left'> <input type='number' step='0.01' name=trigger_diameter min='0' max='999' placeholder=')";
-    content += trigger_dia;
-    content += R"(
-          '> </td>
-          </tr>
-          <tr>
-           <td align='left'> <input type=submit value=send> <INPUT type=reset> </td> 
-        </tr>
-      </table>
-   </form><br /><br />)";
-
-    content += "<table><tr>";
-    content += "<td align 'left'> reset length </td> <td align='center'> <a href='trigger_reset'><button>-> reset</button></a></td>";
+    
+    content += R"(<br>
+        <table align='center'><tr>
+            <td align='left'> diameter of roller:</td>
+            <td align='left'><form><input type='number' step='0.01' id='Trigger_Dia' placeholder='200'></td>)";
+    content +="<td align='left'> <input type='button' onclick=\"SendString('Trigger_Dia','')\" class='button'></form></td>";
+    content += "</tr></table>";
+    
+    content += "<table align='center'><tr>";
+    content += "<td align='left'> <input type='button' onclick=\"sendData('Trigger_Reset',1,'ControlPage')\" class='button' value='reset length'></form></td>";
     content += "</tr></table>";
 
 
@@ -245,8 +215,8 @@ String getContent()
   }//END Trigger_TOOL
 
   if (Thermo_Tool) {
+    
     content += "Control the Thermo_Tool<br /><br />";
-
     content += "nothing to control yet<br /><br />";
 
   }//END ADC_TOOL
@@ -254,61 +224,32 @@ String getContent()
   if (TOF_Tool) {
     content += "Control the TOF_Tool<br />";
 
-    content += plotWebsite;
-
-    content += "</tr></table>";  //input of the max and min value which is displayed on the OLED
-    content += R"(
-    <br><br><form action=/specificArgs method=get>
-        <table>
+    content += R"(<br>
+        <table align='center'><tr>
+            <td align='left'> max value to display:</td>
+            <td align='left'><form><input type='number' size='1' min='-9999' max='9999' id='TOF_MaxDisplay' placeholder='200'></td>)";
+    content +="<td align='left'> <input type='button' onclick=\"SendString('TOF_MaxDisplay','')\" class='button'></form></td>";
+    content += R"(</tr>
+         <tr>
+            <td align='left'> min value to display:</td>
+            <td align='left'><form><input type='number' size='1' min='-9999' max='9999' id="TOF_MinDisplay" placeholder="0"></td>)";
+    content += "<td align='left'> <input type='button' onclick=\"SendString('TOF_MinDisplay','')\" class='button'></form></td>";
+    content += R"(</tr>
           <tr>
-            <td align='left'> max value to display:</td> 
-            <td align='left'> <input type='number'  name=web_max_display min='-9999' max='9999' placeholder=')";
-    content += max_display;
-    content += R"(
-          '> </td>
-          </tr>
-          <tr>
-            <td align='left'> min value to display:</td> 
-            <td align='left'> <input type='number'  name=web_min_display min='-9999' max='9999' placeholder=')";
-    content += min_display;
-    content += R"(
-            '> </td>
-          </tr>
-          <tr>
-           <td align='left'> <input type=submit value=send> <INPUT type=reset> </td> 
-        </tr>
-      </table>
-   </form>)";
-
-    content += "</tr></table>";  //input of the offset when you want to set the sensor
-    content += R"(
-    <br><br><form action=/specificArgs method=get>
-        <table>
-          <tr>
-            <td align='left'> preset value for act position: <br/>(9999 for reset)</td> 
-            <td align='left'> <input type='number' size='1' name=web_tof_preset min='-9999' max='9999' placeholder=')";
-    content += tof_preset;
-    content += R"(
-          '> </td>
-          </tr>
-          <tr>
-           <td align='left'> <input type=submit value=send> <INPUT type=reset> </td> 
-        </tr>
-      </table>
-   </form>)";
-
-
-
+            <td align='left'> preset value for act position: <br/>(9999 for reset)</td>
+            <td align='left'><form><input type='number' size='1' min='-9999' max='9999' id='TOF_Preset' placeholder='0'></td>)";
+    content +="<td align='left'> <input type='button' onclick=\"SendString('TOF_Preset','')\" class='button'></form></td>";
+    content += "</tr></table>";
 
     content +=    "<br><br>measurement mode";
-    content +=    "<form action=/specificArgs method=get>";
-    content +=    "<input type='radio' name=tof_measurement_mode value=1 onclick='this.form.submit()'";
+    content +=    "<form>";
+    content +=    "<input type='radio' onclick=\"sendData('TOF_Mode',1,'ControlPage')\"";
     if (tof_rangeMode == 1)content +=    " checked ";
     content +=    ">long range<BR>";
-    content +=    "<input type='radio' name=tof_measurement_mode value=2 onclick='this.form.submit()'";
+    content +=    "<input type='radio' onclick=\"sendData('TOF_Mode',2,'ControlPage')\"";
     if (tof_rangeMode == 2)content += " checked";
     content +=    ">high speed<BR>";
-    content +=    "<input type='radio' name=tof_measurement_mode value=3 onclick='this.form.submit()'";
+    content +=    "<input type='radio' onclick=\"sendData('TOF_Mode',3,'ControlPage')\"";
     if (tof_rangeMode == 3)content += " checked";
     content +=    ">high precision<BR>";
     content +=    "</form>";
@@ -321,103 +262,34 @@ String getContent()
 
     //content += plotWebsite;
 
-    //  content += "</tr></table>";  //input of the max and min value which is displayed on the OLED
-    //  content += R"(
-    //    <br><br><form action=/specificArgs method=get>
-    //        <table>
-    //          <tr>
-    //            <td align='left'> max value to display:</td>
-    //            <td align='left'> <input type='number'  name=web_max_display min='-9999' max='9999' placeholder=')";
-    //  content += max_display;
-    //  content += R"(
-    //          '> </td>
-    //          </tr>
-    //          <tr>
-    //            <td align='left'> min value to display:</td>
-    //            <td align='left'> <input type='number'  name=web_min_display min='-9999' max='9999' placeholder=')";
-    //  content += min_display;
-    //  content += R"(
-    //            '> </td>
-    //          </tr>
-    //          <tr>
-    //           <td align='left'> <input type=submit value=send> <INPUT type=reset> </td>
-    //        </tr>
-    //      </table>
-    //   </form>)";
-
-
-
     content +=    "<br><br>measurement mode and calibration";
-    content +=    "<form action=/specificArgs method=get>";
-    content +=    "<input type='radio' name=imu_measurement_mode value=1 onclick='this.form.submit()'";
+    content +=    "<form>";
+    content +=    "<input type='radio' onclick=\"sendData('IMU_Mode',1,'ControlPage')\"";
     if (imu_mode == 1)content +=    " checked ";
     content +=    ">bubble level<BR>";
-    content +=    "<input type='radio' name=imu_measurement_mode value=2 onclick='this.form.submit()'";
+    content +=    "<input type='radio' onclick=\"sendData('IMU_Mode',2,'ControlPage')\"";
     if (imu_mode == 2)content += " checked";
     content +=    ">compass<BR>";
-    content +=    "<input type='radio' name=imu_measurement_mode value=3 onclick='this.form.submit()'";
+    content +=    "<input type='radio' onclick=\"sendData('IMU_Mode',3,'ControlPage')\"";
     if (imu_mode == 3)content += " checked";
     content +=    ">raw data<BR>";
-    content +=    "<input type='radio' name=imu_measurement_mode value=4 onclick='this.form.submit()'";
+    content +=    "<input type='radio' onclick=\"sendData('IMU_Mode',4,'ControlPage')\"";
     if (imu_mode == 4)content += " checked";
     content +=    ">calibrate magnetometer<BR>";
     content +=    "</form>";
-
-
-
-
-
 
 
   }//END IMU TOOL
 
 
   if ( (FFT_Tool == false) && (ADC_Tool == false) && (Trigger_Tool == false) && (Trigger_Out_Tool == false) && (Thermo_Tool == false) && (APDS_Tool == false) && (Power_Tool == false) && (TOF_Tool == false) && (DAC_Tool == false) && (IMU_Tool == false)   ) {
-    content += "no Sensor connected";
+    content += "no Sensor connected <br>";
+    content += "<img src='/PICS/Sensor-Tool.png' alt='no SD Card found'>";
   }
 
-  if (hasSD == true) { //plotting the datalogging functions if SD Card is inserted
-    content += "<br><br>";
-
-    content += "<table><tr>";
-
-    if (datalog)
-    {
-      content += "<td align 'left'> Datalog (active): </td> <td align='center'> <a href='datalog'><button>-> stop datalogging </button></a></td></tr>";
-    }
-    else
-    {
-      content += "<td align 'left'> Datalog (inactive): </td> <td align='center'> <a href='datalog'><button>-> start datalogging </button></a></td></tr>";
-    }
-
-    if (datalog == true  && datalogging == false) {
-      content += "<tr><td align 'left'> <font color=#FF0000>Datalogging failed!</font> </td> <td </td></tr>";
-    }
-
-    content += R"(
-    <br><br><form action=/specificArgs method=get>
-        <table>
-          <tr>
-            <td align='left'> file name for data logging:</td> 
-            <td align='left'> <input type='text' size='5' name=datafilename placeholder=')";
-    content += datafile;
-    content += R"(
-          '> </td>
-          </tr>
-          <tr>
-           <td align='left'> <input type=submit and start value=send> <INPUT type=reset> </td> 
-        </tr>
-      </table>
-   </form>)";
-
-    content += "</tr></table>";
-
-
-
-    content += "<p><a href='/edit'>Launch File Browser</a></p>";
+ // content += "</div><div id='mybutton'>";
+ // content += "<a href='/' class='button'>&#8634</a> </div>";
   
-  }
-
   content += "</body></html>";
   return content;
 
@@ -425,41 +297,57 @@ String getContent()
 
 //start ´of creating webpage for plotting data
 
-String getPlot()
-{
-  // create content for the website:
-  String plotpage = "<html><head><title>ESP8266 WebControl</title></head><body>";
-  plotpage += "<meta name='viewport' content='width=device-width, initial-scale=1'>";   //fit webpage to screen size
-  plotpage += headlinks;
-  if (FFT_Tool) {
-    plotpage += "<meta http-equiv='refresh' content='5'>";
-    plotpage += plotWebsite;
-  }
-  if (TOF_Tool) {
-    plotpage += "<meta http-equiv='refresh' content='1'>";
-    plotpage += plotWebsite;
-  }
-  return plotpage;
-  plotpage += "</body></html>";
+//String getPlot()
+//{
+//  // create content for the website:
+//  String plotpage = //HeadOfPage;
+//  
+//  
+//  plotpage +=     R"(<div class='pagination'>
+//                  <a href='/'     >Home</a>
+//                  <a href='/plot' class='active'>PlotPage</a>
+//                  <a href='/links'>Downloads</a>
+//                  </div><br>
+//                  )";
+//  
+//  if (FFT_Tool || Thermo_Tool) {
+//    plotpage += "<meta http-equiv='refresh' content='5'>";
+//    //plotpage += "<style svg polyline{-webkit-animation: dash 0s linear forwards;animation: dash 0s linear forwards;} /style>  ";
+//    plotpage += plotWebsite;
+//  }
+//  if (TOF_Tool) {
+//    plotpage += "<meta http-equiv='refresh' content='1'>";
+//    plotpage += plotWebsite;
+//  }
+//  
+//  plotpage += "</div></body></html>";
+//  
+//  return plotpage;
+//
+//}// end of getting plotPage String
 
 
-}// end of getting plotPage String
 
 
-
-
-String getLinks()
-{
-  // create content for the website:
-  String linkpage = "<html><head><title>ESP8266 WebControl</title></head><body>";
-  linkpage += "<meta name='viewport' content='width=device-width, initial-scale=1'>";   //fit webpage to screen size
-  linkpage += headlinks;
-  linkpage += "<td align 'left'>  </td> <td align='center'> <a href='refreshlinks'><button> refresh the links</button></a></td></tr>";
-  linkpage += getfilelinks; 
-  linkpage += "</body></html>";
-  return linkpage;
-
-}// end of getting linkpage String
+//String getLinks()
+//{
+//  // create content for the website:
+//  String linkpage = //HeadOfPage;//"<html><head><title>ESP8266 WebControl</title></head><body><div class="content">";
+//  //linkpage += "<meta name='viewport' content='width=device-width, initial-scale=1'>";   //fit webpage to screen size
+//  
+//  linkpage +=     R"(<div class='pagination'>
+//                  <a href='/'     >Home</a>
+//                  <a href='/plot' >PlotPage</a>
+//                  <a href='/links' class='active'>Downloads</a>
+//                  </div><br>
+//                  )";
+//  
+//  linkpage += "<td align 'left'>  </td> <td align='center'> <a href='refreshlinks'><button class='button'> refresh the links</button></a></td></tr>";
+//  linkpage += getfilelinks; 
+//  linkpage += "</div></body></html>";
+//  return linkpage;
+//
+//}// end of getting linkpage String
 
 
 
